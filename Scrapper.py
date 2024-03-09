@@ -1,199 +1,89 @@
 import requests
 from bs4 import BeautifulSoup
-import pandas as pd
-
-event_links = []
-
-# Scrape the list page
-for page_num in range(1, 6):  # Assuming there are 41 pages
-    url = f"https://visitseattle.org/events/page/{page_num}"
-    res = requests.get(url)
-    soup = BeautifulSoup(res.text, "html.parser")
-    
-    # Extract the url in href of a tags to the event detail page
-    a_tags = soup.select("div.search-result-preview > div > h3 > a")
-    event_links.extend([a['href'] for a in a_tags])
-
-# Print the event links
-print(event_links)
-
-
 import csv
 
-# Create a list to store the event details
-event_details = []
-
-# Loop through the event links
-for event_link in event_links:
-    # HTTP GET the detail page HTML
-    res = requests.get(event_link)
-    soup = BeautifulSoup(res.text, "html.parser")
-    
-    # Extract the event details
-    name = soup.select_one("div.medium-6.columns.event-top > h1")
-    date = soup.select_one("div.medium-6.columns.event-top > h4 > span:nth-child(1)")
-    location = soup.select_one("div.medium-6.columns.event-top > h4 > span:nth-child(2)")
-    event_type = soup.select_one("div.medium-6.columns.event-top > a:nth-child(3)")
-    region = soup.select_one("div.medium-6.columns.event-top > a:nth-child(4)")
-    
-    # Check if the elements exist before accessing their text attribute
-    if name is not None:
-        name = name.text.strip()
-    if date is not None:
-        date = date.text.strip()
-    if location is not None:
-        location = location.text.strip()
-    if event_type is not None:
-        event_type = event_type.text.strip()
-    if region is not None:
-        region = region.text.strip()
-    
-    # Append the event details to the list
-    event_details.append([name, date, location, event_type, region])
-
-# Store the event details as CSV
-with open("events.csv", "w", newline="") as csvfile:
-    writer = csv.writer(csvfile)
-    writer.writerow(["Name", "Date", "Location", "Type", "Region"])  # Write the header
-    writer.writerows(event_details)  # Write the event details
-
-import csv
-
-# Create a list to store the event details
-event_details = []
-
-# Loop through the event links
-for event_link in event_links:
-    # HTTP GET the detail page HTML
-    res = requests.get(event_link)
-    soup = BeautifulSoup(res.text, "html.parser")
-    
-    # Extract the event details
-    name = soup.select_one("div.medium-6.columns.event-top > h1")
-    date = soup.select_one("div.medium-6.columns.event-top > h4 > span:nth-child(1)")
-    location = soup.select_one("div.medium-6.columns.event-top > h4 > span:nth-child(2)")
-    event_type = soup.select_one("div.medium-6.columns.event-top > a:nth-child(3)")
-    region = soup.select_one("div.medium-6.columns.event-top > a:nth-child(4)")
-    
-    # Check if the elements exist before accessing their text attribute
-    if name is not None:
-        name = name.text.strip()
-    if date is not None:
-        date = date.text.strip()
-    if location is not None:
-        location = location.text.strip()
-    if event_type is not None:
-        event_type = event_type.text.strip()
-    if region is not None:
-        region = region.text.strip()
-    
-    # Append the event details to the list
-    event_details.append([name, date, location, event_type, region])
-
-# Store the event details as CSV
-with open("events.csv", "w", newline="") as csvfile:
-    writer = csv.writer(csvfile)
-    writer.writerow(["Name", "Date", "Location", "Type", "Region"])  # Write the header
-    writer.writerows(event_details)  # Write the event details
-
-def get_seattle_weather_forecast():
-   
-    seattle_lat = '47.6062'
-    seattle_lon = '-122.3321'
-    return get_latest_weather_forecast(seattle_lat, seattle_lon)
-
-
-base_url = "https://visitseattle.org/events/page/"
-num_pages = 46
-events = []
-for page in range (0,num_pages):
-    url = base_url + str(page)
+def extract(page):
+    url = f'https://visitseattle.org/events/page/{page}'
     res = requests.get(url)
     soup = BeautifulSoup(res.text, 'html.parser')
-    selector = 'div.search-result-preview > div > h3 > a'
-    a_eles=soup.select(selector)
-    events = events + [x['href'] for x in a_eles]
+    return soup
 
-events
+def extract_event_urls(soup):
+    selector = "div.search-result-preview > div > h3 > a"
+    a_eles = soup.select(selector)
+    return [x['href'] for x in a_eles]
 
-eventdata = []
+def extract_event_details(event_url):
+    response = requests.get(event_url)
+    soup = BeautifulSoup(response.text, 'html.parser')
 
-for event in events:
-    res = requests.get(event)
+    # Extracting details
+    name = soup.find('h1', class_='page-title').text.strip()
+    date = soup.find("h4").find_all("span")[0].text.strip()
+    location = soup.find("h4").find_all("span")[1].text.strip()
+    event_type = soup.find_all("a", class_="button big medium black category")[0].text.strip()
+    region = soup.find_all("a", class_="button big medium black category")[1].text.strip()
+    
+    return [name, date, location, event_type, region]
 
-    if res.status_code == 200:
-        soup = BeautifulSoup(res.content, 'html.parser')
-        
-        name = soup.select_one('div.medium-6.columns.event-top > h1')
-        date_time = soup.select_one('div.medium-6.columns.event-top > h4 > span:nth-child(1)')
-        location = soup.select_one('div.medium-6.columns.event-top > h4 > span:nth-child(2)')
-        event_type = soup.select_one('div.medium-6.columns.event-top > a:nth-child(3)')
-        region = soup.select_one('div.medium-6.columns.event-top > a:nth-child(4)')
+# Extract event URLs
+event_data = []
+for page in range(0, 2):
+    print(f'Getting page {page}...')
+    soup = extract(page)
+    event_urls = extract_event_urls(soup)
+    for event_url in event_urls:
+        data = extract_event_details(event_url)
+        event_data.append(data)
 
-        eventdata.append({
-            "Name": name.get_text(strip=True) if name else "Not found",
-            "Date & Time": date_time.get_text(strip=True) if date_time else "Not found",
-            "Location": location.get_text(strip=True) if location else "Not found",
-            "Type": event_type.get_text(strip=True) if event_type else "Not found",
-            "Region": region.get_text(strip=True) if region else "Not found"
-        })
-
-
-df = pd.DataFrame(eventdata)
-df.to_csv("events.csv")
-
-# Read CSV file
-csv_file = 'events.csv' 
-df = pd.read_csv(csv_file)
-
-# Adding new columns for latitude and longitude
-df['Latitude'] = None
-df['Longitude'] = None
-
-for index, row in df.iterrows():
-    lat, lon = get_lat_lon(row['Location'])
-    if lat is not None and lon is not None:
-        df.at[index, 'Latitude'] = lat
-        df.at[index, 'Longitude'] = lon
+# Use OpenStreetMap API to get latitude and longitude for locations
+for data in event_data:
+    region_name = data[4].split('/')[0].strip()  # Extract the first name before the '/'
+    region_name = f"{region_name}, Seattle"  # Append ", Seattle"
+    #print (region_name)
+    base_url = "https://nominatim.openstreetmap.org/search.php"
+    query_params = {
+        "q": region_name,
+        "format": "jsonv2"
+    }
+    res = requests.get(base_url, params=query_params)
+    location_data = res.json()
+    #print(location_data)
+    if location_data:
+        latitude = location_data[0]['lat']
+        longitude = location_data[0]['lon']
+        data.extend([latitude, longitude])
     else:
-        # Handle cases where coordinates are not found or invalid
-        print(f"Coordinates not found or invalid for location: {row['Location']}")
+        data.extend([None, None])
 
-# Save the updated DataFrame to a new CSV file
-df.to_csv('events_with_LongLat.csv', index=False)
-
-csv_file = 'events_with_LongLat.csv'
-df = pd.read_csv(csv_file)
-
-# Adding new columns for weather details
-df['weather'] = None
-df['temperature'] = None
-df['wind_speed'] = None
-df['wind_direction'] = None
-
-for index, row in df.iterrows():
-    lat = row.get('Latitude')
-    lon = row.get('Longitude')
-    date_str = row['Date & Time'].split(' ')[0]
-
-    if pd.notna(lat) and pd.notna(lon):
-        try:
-            if date_str.lower() == 'now' or date_str.lower() == 'ongoing':
-                weather_info = get_latest_weather_forecast(lat, lon)
+# Step 4: Look up the weather
+weather_api_url = "https://api.weather.gov/points/{},{}"
+for data in event_data:
+    if data[-2] is not None and data[-1] is not None:
+        weather_url = weather_api_url.format(data[-2], data[-1])
+        response = requests.get(weather_url)
+        if response.status_code == 200:
+            point_dict = response.json()
+            point_dict
+            forcast_url = point_dict['properties']['forecast']
+            res = requests.get(forcast_url)
+            weather_data = res.json()
+            #print(weather_data)
+            if 'properties' in weather_data and 'periods' in weather_data['properties']:
+                forecast = weather_data['properties']['periods'][0]['detailedForecast']
+                data.append(forecast)
             else:
-                event_date = datetime.strptime(date_str, '%m/%d/%Y').date()
-                weather_info = get_weather_forecast(lat, lon, event_date)
-
-            # Check if weather info is not returned
-            if not all(weather_info):
-                weather_info = get_seattle_weather_forecast()  # Default to Seattle weather
-        except Exception:
-            weather_info = get_seattle_weather_forecast()  # Default to Seattle weather
+                data.append("Weather data not available")
+        else:
+            data.append("Weather data not available")
     else:
-        weather_info = get_seattle_weather_forecast()  # Default to Seattle weather
+        data.append("Weather data not available")
 
-    # Update the DataFrame with the weather information
-    df.at[index, 'weather'], df.at[index, 'temperature'], df.at[index, 'wind_speed'], df.at[index, 'wind_direction'] = weather_info
+# Store data as CSV
+header = ['Name', 'Date', 'Location', 'Type', 'Region', 'Latitude', 'Longitude', 'Weather Forecast']
+with open('events.csv', 'w', newline='', encoding='utf-8') as csvfile:
+    csv_writer = csv.writer(csvfile)
+    csv_writer.writerow(header)
+    csv_writer.writerows(event_data)
 
-# Export the updated dataframe to a CSV file
-df.to_csv('Seattle_Events_Detail_Forcast.csv', index=False)
+print("Data has been successfully written to events.csv.")
